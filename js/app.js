@@ -16,7 +16,8 @@
 
   var state = {
     file: null,          // {name, size, buf}
-    loadOpt: { format: "auto", encoding: "auto", header: "yes", tz: "JST", fyStart: 4 },
+    // headerRow / dataRow は 1 始まり(null は自動)。colNames は列番号順の、画面で付けた列名
+    loadOpt: { format: "auto", encoding: "auto", header: "yes", headerRow: null, dataRow: null, colNames: [], tz: "JST", fyStart: 4 },
     table: null,
     defs: [],
     cols: {},
@@ -166,6 +167,7 @@
       state.file = { name: file.name, size: file.size, buf: buf, ref: file };
       state.loadOpt.format = "auto";
       state.loadOpt.encoding = "auto";
+      resetRowOptions();
       loadData(true);
     }).catch(function (err) {
       showBanner("error", "ファイルを読み込めませんでした", [String(err && err.message || err)]);
@@ -179,6 +181,13 @@
     clearBanners();
     $("load-result").hidden = true;
     $("viz-section").hidden = true;
+  }
+
+  /** 開始行と列名の指定を既定(自動)に戻す */
+  function resetRowOptions() {
+    state.loadOpt.headerRow = null;
+    state.loadOpt.dataRow = null;
+    state.loadOpt.colNames = [];
   }
 
   function parseOpt() {
@@ -195,6 +204,9 @@
         format: state.loadOpt.format,
         fileName: state.file.name,
         hasHeader: state.loadOpt.header !== "no",
+        headerRow: state.loadOpt.headerRow,
+        dataRow: state.loadOpt.dataRow,
+        columnNames: state.loadOpt.colNames,
       });
     } catch (err) {
       showBanner("error", "データを解析できませんでした", [
@@ -209,7 +221,7 @@
     state.table = table;
     state.encoding = dec.encoding;
     if (!table.rows.length || !table.columns.length) {
-      showBanner("error", "データ行が見つかりません", ["ファイルの中身、または「ファイル形式」の設定を確認してください。"]);
+      showBanner("error", "データ行が見つかりません", ["ファイルの中身、または「ファイル形式」「列名の行の位置」「データの開始行」の設定を確認してください。"]);
     }
     if (table.errorCount) {
       var lines = table.errors.slice(0, 5).map(function (e) {
@@ -231,6 +243,7 @@
     reportInvalid();
 
     renderLoadOptions(dec.encoding, table);
+    renderRawHead();
     renderStats();
     renderColumnTable();
     renderPreview();
@@ -269,13 +282,23 @@
   function renderLoadOptions(encoding, table) {
     var fmtLabel = table ? "自動(" + P.FORMAT_LABEL[table.format] + ")" : "自動";
     mountSelect("opt-format", [["auto", fmtLabel], ["jsonl", "JSON Lines"], ["json", "JSON 配列"], ["csv", "CSV"], ["tsv", "TSV"]], state.loadOpt.format)
-      .addEventListener("change", function (e) { state.loadOpt.format = e.target.value; loadData(false); });
+      .addEventListener("change", function (e) { state.loadOpt.format = e.target.value; resetRowOptions(); loadData(false); });
     var encLabel = { "utf-8": "UTF-8", shift_jis: "Shift_JIS", "utf-16le": "UTF-16LE", "utf-16be": "UTF-16BE" };
     mountSelect("opt-encoding", [["auto", "自動(" + (encLabel[encoding] || encoding) + ")"], ["utf-8", "UTF-8"], ["shift_jis", "Shift_JIS"], ["utf-16le", "UTF-16LE"]], state.loadOpt.encoding)
       .addEventListener("change", function (e) { state.loadOpt.encoding = e.target.value; loadData(false); });
     var isDelim = table && (table.format === "csv" || table.format === "tsv");
-    var hdr = mountSelect("opt-header", [["yes", "列名(ヘッダー)"], ["no", "データ"]], state.loadOpt.header, { disabled: !isDelim });
+    var hdr = mountSelect("opt-header", [["yes", "あり"], ["no", "なし"]], state.loadOpt.header, { disabled: !isDelim });
     hdr.addEventListener("change", function (e) { state.loadOpt.header = e.target.value; loadData(false); });
+    // 開始行: 空欄は自動。自動で決まった行は placeholder に出す
+    var hasHeader = state.loadOpt.header !== "no";
+    var hr = $("opt-header-row");
+    hr.disabled = !isDelim || !hasHeader;
+    hr.value = hasHeader && state.loadOpt.headerRow ? state.loadOpt.headerRow : "";
+    hr.placeholder = isDelim && table.headerRow ? "自動(" + table.headerRow + " 行目)" : "";
+    var dr = $("opt-data-row");
+    dr.disabled = !isDelim;
+    dr.value = state.loadOpt.dataRow || "";
+    dr.placeholder = isDelim ? "自動(" + table.dataRow + " 行目)" : "";
     mountSelect("opt-tz", [["JST", D.TZ_LABEL.JST], ["UTC", D.TZ_LABEL.UTC], ["local", D.TZ_LABEL.local]], state.loadOpt.tz, { "aria-describedby": "opt-tz-help" })
       .addEventListener("change", function (e) { state.loadOpt.tz = e.target.value; refreshDatetimeColumns(); });
     var months = [];
@@ -285,6 +308,41 @@
         state.loadOpt.fyStart = parseInt(e.target.value, 10);
         refreshDatetimeColumns();
       });
+  }
+
+  function onRowOptionChange(key, e) {
+    var n = parseInt(e.target.value, 10);
+    state.loadOpt[key] = n >= 1 ? n : null;
+    loadData(false);
+  }
+
+  /** ファイルの先頭を行番号つきで表示する(列名の行・データの開始行を確かめるため) */
+  function renderRawHead() {
+    var t = state.table;
+    var section = $("raw-head-section");
+    var body = $("raw-head-body");
+    body.textContent = "";
+    if (!t.rawHead) { section.hidden = true; return; }
+    section.hidden = false;
+    var width = t.rawHead.reduce(function (m, r) { return Math.max(m, r.length); }, 1);
+    $("raw-head-content").colSpan = width;
+    function chip(text, color) {
+      return el("span", { className: "dads-chip-label", "data-style": "filled-1", "data-color": color, text: text });
+    }
+    t.rawHead.forEach(function (r, i) {
+      var line = i + 1;
+      var empty = r.every(function (v) { return String(v).trim() === ""; });
+      var role = null;
+      if (line === t.headerRow) role = chip("列名", "blue");
+      else if (line === t.dataRow) role = chip("データの開始", "green");
+      else if (line < t.dataRow || empty) role = el("span", { className: "app-text-muted", text: empty ? "空行" : "読み飛ばす" });
+      var cells = [];
+      for (var c = 0; c < width; c++) cells.push(el("td", { text: r[c] === undefined ? "" : String(r[c]).slice(0, 60) }));
+      body.appendChild(el("tr", { className: line < t.dataRow && line !== t.headerRow ? "app-row-skipped" : null }, [
+        el("th", { scope: "row", className: "app-rownum", text: String(line) }),
+        el("td", null, [role]),
+      ].concat(cells)));
+    });
   }
 
   function refreshDatetimeColumns() {
@@ -368,7 +426,7 @@
       var granText = c.type === "datetime" && m.granularity ? D.GRAN_LABEL[m.granularity] : "—";
       var bad = m.missing + " / " + m.invalid;
       var tr = el("tr", null, [
-        el("th", { scope: "row", className: "app-colname", text: c.name }),
+        el("th", { scope: "row", className: "app-colname" }, [makeNameInput(c, i)]),
         el("td", null, [typeSel]),
         fmtCell,
         el("td", { text: granText }),
@@ -377,6 +435,53 @@
       ]);
       tbody.appendChild(tr);
     });
+  }
+
+  /** 列名の入力欄。確定(change)で列名を変える */
+  function makeNameInput(c, i) {
+    var input = el("input", {
+      id: "col-name-" + i, className: "dads-input-text__input", type: "text", "data-size": "sm",
+      value: c.name, placeholder: state.table.sourceColumns[i], "aria-label": (i + 1) + " 列目の列名",
+    });
+    input.addEventListener("change", function () { renameColumn(c, input.value); });
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); input.blur(); } });
+    return el("span", { className: "dads-input-text app-colname-input" }, [input]);
+  }
+
+  /**
+   * 列名を変える。型の手動変更やグラフの設定を保つため、再解析せずその場で付け替える。
+   * 空なら元の列名に戻し、他の列と重なる名前には _2 などを付ける。
+   */
+  function renameColumn(c, name) {
+    var t = state.table;
+    var old = c.name;
+    name = String(name).trim();
+    var custom = name !== "";
+    var others = t.columns.slice();
+    others.splice(c.index, 1);
+    name = P.uniqueHeaders(others.concat([custom ? name : t.sourceColumns[c.index]])).pop();
+    state.loadOpt.colNames[c.index] = custom ? name : null;
+    if (name === old) { renderColumnTable(); return; }
+
+    t.columns[c.index] = name;
+    c.name = name;
+    state.cols[name] = c;
+    delete state.cols[old];
+    state.mat[name] = state.mat[old];
+    delete state.mat[old];
+    [state.yChecked, state.yRight].forEach(function (set) {
+      if (set.delete(old)) set.add(name);
+    });
+    // 選択中の列は、選択肢の値を新しい列名に書き換えて選択を保つ
+    ["x-col", "split-col", "filter-col"].forEach(function (id) {
+      var sel = $(id);
+      if (sel && sel.value === old) sel.options[sel.selectedIndex].value = name;
+    });
+    reportInvalid();
+    renderColumnTable();
+    renderPreview();
+    updateDependentControls();
+    scheduleRender(0);
   }
 
   /** カスタム書式の入力欄(DADS インプットテキスト + 適用ボタン) */
@@ -943,6 +1048,8 @@
     LABEL_INPUTS.forEach(function (id) {
       $(id).addEventListener("input", function () { scheduleRender(300); });
     });
+    $("opt-header-row").addEventListener("change", function (e) { onRowOptionChange("headerRow", e); });
+    $("opt-data-row").addEventListener("change", function (e) { onRowOptionChange("dataRow", e); });
     $("settings").addEventListener("submit", function (e) { e.preventDefault(); });
   }
 

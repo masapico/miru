@@ -117,8 +117,26 @@
             <div class="dads-form-control-label__field" data-select="opt-encoding"></div>
           </div>
           <div class="dads-form-control-label" data-size="sm">
-            <label class="dads-form-control-label__label" for="opt-header">CSV の 1 行目</label>
+            <label class="dads-form-control-label__label" for="opt-header">列名の行(CSV / TSV)</label>
             <div class="dads-form-control-label__field" data-select="opt-header"></div>
+          </div>
+          <div class="dads-form-control-label" data-size="sm">
+            <label class="dads-form-control-label__label" for="opt-header-row">列名の行の位置</label>
+            <p id="opt-header-row-help" class="dads-form-control-label__support-text">空欄なら自動で判定</p>
+            <div class="dads-form-control-label__field">
+              <span class="dads-input-text">
+                <input id="opt-header-row" class="dads-input-text__input app-input-full" type="number" min="1" step="1" data-size="sm" aria-describedby="opt-header-row-help">
+              </span>
+            </div>
+          </div>
+          <div class="dads-form-control-label" data-size="sm">
+            <label class="dads-form-control-label__label" for="opt-data-row">データの開始行</label>
+            <p id="opt-data-row-help" class="dads-form-control-label__support-text">空欄なら列名の行の次</p>
+            <div class="dads-form-control-label__field">
+              <span class="dads-input-text">
+                <input id="opt-data-row" class="dads-input-text__input app-input-full" type="number" min="1" step="1" data-size="sm" aria-describedby="opt-data-row-help">
+              </span>
+            </div>
           </div>
           <div class="dads-form-control-label" data-size="sm">
             <label class="dads-form-control-label__label" for="opt-tz">データのタイムゾーン</label>
@@ -132,6 +150,32 @@
         </div>
       </fieldset>
 
+      <details class="dads-accordion" id="raw-head-section" hidden>
+        <summary id="acc-raw-head" class="dads-accordion__summary">
+          <span class="dads-accordion__icon">
+            <svg class="dads-accordion__icon-svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3.3 7.3L12 16L20.7 7.3" fill="none" stroke="currentcolor" stroke-width="2"/>
+            </svg>
+          </span>
+          <h2>ファイルの先頭(行番号つき)</h2>
+        </summary>
+        <div class="dads-accordion__content">
+          <p class="app-text-muted">列名の行やデータの開始行が合っていない場合は、ここで行番号を確かめて「読み込み設定」に入力してください。</p>
+          <div class="dads-table app-table-scroll" data-size="dense">
+            <table class="dads-table__table" data-cell-border="bottom">
+              <thead>
+                <tr>
+                  <th class="dads-table__col-header" scope="col">行</th>
+                  <th class="dads-table__col-header" scope="col">扱い</th>
+                  <th class="dads-table__col-header" scope="col" id="raw-head-content">内容</th>
+                </tr>
+              </thead>
+              <tbody id="raw-head-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
       <details class="dads-accordion" open>
         <summary id="acc-columns" class="dads-accordion__summary">
           <span class="dads-accordion__icon">
@@ -139,10 +183,10 @@
               <path d="M3.3 7.3L12 16L20.7 7.3" fill="none" stroke="currentcolor" stroke-width="2"/>
             </svg>
           </span>
-          <h2>列の型と書式(自動判定結果)</h2>
+          <h2>列名・型・書式(自動判定結果)</h2>
         </summary>
         <div class="dads-accordion__content">
-          <p class="app-text-muted">判定が誤っている場合は、型や日時の書式を変更してください。書式一覧にない日時は「カスタム」で <code>yyyy年M月d日 H時</code> のように指定できます(y:年 M:月 d:日 H:時 m:分 s:秒 g:元号 e:和暦年 Q:四半期)。</p>
+          <p class="app-text-muted">列名は入力欄で変更できます(空にすると元の列名に戻ります)。判定が誤っている場合は、型や日時の書式を変更してください。書式一覧にない日時は「カスタム」で <code>yyyy年M月d日 H時</code> のように指定できます(y:年 M:月 d:日 H:時 m:分 s:秒 g:元号 e:和暦年 Q:四半期)。</p>
           <div class="dads-table app-table-scroll" data-size="dense">
             <table class="dads-table__table" data-cell-border="bottom">
               <thead>

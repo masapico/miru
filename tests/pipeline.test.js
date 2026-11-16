@@ -142,3 +142,63 @@ test("右軸だけ棒のときも、数値の X はカテゴリ軸にする", ()
   const stacked = T.build(ctx, { chartType: "area", chartTypeRight: "stacked", x: "n", ys, agg: "none", bucket: "raw", display });
   assert.equal(stacked.xKind, "category");
 });
+
+test("前置きつき CSV: 列名の行を自動で決める", () => {
+  const text = fs.readFileSync(path.join(__dirname, "..", "sample", "preamble_units.csv"), "utf8");
+  const auto = P.parse(text, { fileName: "preamble_units.csv" });
+  assert.equal(auto.headerRow, 4);
+  assert.equal(auto.dataRow, 5);
+  assert.deepEqual(auto.columns, ["年月", "地域", "売上", "来客数"]);
+  assert.deepEqual(auto.rows[0], [null, null, "千円", "人"]); // 単位行はデータの開始行を指定して外す
+  assert.deepEqual(auto.rawHead[0], ["地域別 月次売上(サンプル)", "", "", ""]);
+
+  const { table, defs } = load(text, "preamble_units.csv", { dataRow: 6 });
+  assert.equal(table.dataRow, 6);
+  assert.equal(table.rows.length, 12);
+  assert.deepEqual(table.rows[0], ["2025-04", "東", "1200", "340"]);
+  assert.deepEqual(defs.map((c) => c.type), ["datetime", "category", "number", "number"]);
+  assert.equal(table.errorCount, 0);
+
+  // 先頭が普通のヘッダーなら今までどおり 1 行目
+  const plain = P.parse(fs.readFileSync(path.join(__dirname, "..", "sample", "monthly_wareki.csv"), "utf8"), { fileName: "m.csv" });
+  assert.equal(plain.headerRow, 1);
+  assert.equal(plain.dataRow, 2);
+});
+
+test("列名の行・データの開始行の指定と、警告の行番号", () => {
+  const text = "メモ\na,b,c\n(単位),,\n\n1,2,3\n4,5\n7,8,9\n";
+  const t = P.parse(text, { fileName: "x.csv", headerRow: 2, dataRow: 4 });
+  assert.deepEqual(t.columns, ["a", "b", "c"]);
+  assert.deepEqual(t.rows, [["1", "2", "3"], ["4", "5", null], ["7", "8", "9"]]);
+  assert.equal(t.errorCount, 1);
+  assert.equal(t.errors[0].line, 6); // 空行も数えた、ファイル上の行番号
+
+  // データの開始行が列名の行以前なら、列名の行の次から
+  assert.equal(P.parse(text, { fileName: "x.csv", headerRow: 2, dataRow: 1 }).dataRow, 3);
+
+  // タブ区切りで前置きが長くても区切り文字を判定できる
+  const tsv = "表題\n作成者\n部署\n日付\n備考1\n備考2\n備考3\n備考4\nx\ty\n1\t2\n3\t4\n";
+  const tt = P.parse(tsv, { fileName: "x.txt" });
+  assert.equal(tt.delimiter, "\t");
+  assert.equal(tt.headerRow, 9);
+  assert.deepEqual(tt.columns, ["x", "y"]);
+  assert.deepEqual(tt.rows, [["1", "2"], ["3", "4"]]);
+});
+
+test("列名なしの CSV に列名を付ける・列名の変更", () => {
+  const text = "出力結果\n\n2026-01-01,東,10\n2026-01-02,西,20\n";
+  const none = P.parse(text, { fileName: "x.csv", hasHeader: false });
+  assert.equal(none.headerRow, null);
+  assert.equal(none.dataRow, 3);
+  assert.deepEqual(none.columns, ["列1", "列2", "列3"]);
+  assert.equal(none.rows.length, 2);
+
+  const named = P.parse(text, { fileName: "x.csv", hasHeader: false, columnNames: ["日付", " ", "列1"] });
+  assert.deepEqual(named.columns, ["日付", "列2", "列1"]);
+  assert.deepEqual(named.sourceColumns, ["列1", "列2", "列3"]);
+  assert.deepEqual(P.parse(text, { fileName: "x.csv", hasHeader: false, columnNames: ["値", "値"] }).columns, ["値", "値_2", "列3"]);
+
+  const jsonl = P.parse('{"very.long.name":1,"b":2}\n', { fileName: "x.jsonl", columnNames: ["短い名前"] });
+  assert.deepEqual(jsonl.columns, ["短い名前", "b"]);
+  assert.deepEqual(jsonl.sourceColumns, ["very.long.name", "b"]);
+});

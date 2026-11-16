@@ -36,7 +36,8 @@ node --test tests/*.test.js
 - **SVG 保存**: `chart-view.js` の `exportSVG` は、canvas2svg のモックのコンテキストに画面と同じ設定で Chart.js を描かせている。canvas2svg に足りないところを `shimSvgContext` で補っている(`setLineDash` などの API、`clip()` でパスが空になる不具合、折れ線の `Path2D` を描画中だけ記録用のクラスに差し替える処理)。Chart.js や canvas2svg を更新したら、SVG の出力(折れ線・目盛・欠測区間の切れ目)を確かめる。
 - **左右の軸の種類**: 右軸の種類は `cfg.chartTypeRight`。混合グラフ(データセットごとの `type`)で描いている。棒の軸は常に 0 から始める。
 - **タイトル・注記・出典**: グラフの中に描くので PNG / SVG にも入る。注記・出典はプラグイン `vizFooter`(レイアウトボックス)で描いている。
-- サンプルは `sample/monthly_wareki.csv`。実システムのログなど公開できないデータはコミットしない。
+- **CSV / TSV の行番号**: 列名の行・データの開始行(`headerRow` / `dataRow`)は、空行も数えた 1 始まりのレコード番号。空行は開始行で切り出した後に除く。列名の変更(`renameColumn`)は再解析せず、`state.cols` / `state.mat` などのキーをその場で付け替える。
+- サンプルは `sample/monthly_wareki.csv` と `sample/preamble_units.csv`(前置き・単位行つき)。実システムのログなど公開できないデータはコミットしない。
 
 ## リリース
 

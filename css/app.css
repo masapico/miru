@@ -245,6 +245,25 @@ code {
   text-align: left;
 }
 
+.app-colname-input {
+  min-width: 160px;
+}
+
+.app-colname-input .dads-input-text__input {
+  width: 100%;
+  font-weight: bold;
+}
+
+.app-rownum {
+  text-align: right;
+  color: var(--app-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-row-skipped td {
+  color: var(--app-text-muted);
+}
+
 .app-example {
   color: var(--app-text-muted);
   max-width: 320px;
