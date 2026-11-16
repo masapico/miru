@@ -7,7 +7,13 @@ CSV などのファイルをブラウザで読み込み、項目を選んでグ�
 - 必要なライブラリはすべて `vendor/` に入っているので、外部との通信は発生しません。閉域網でもそのまま使えます。
 - 画面デザインは[デジタル庁デザインシステム](https://design.digital.go.jp/)の HTML 版コードスニペットを使っています。
 
+![読み込み画面: ファイルを読み込むと、形式・文字コード・各列の型と日時の書式を自動で判定する](docs/images/load.png)
+
+![グラフ作成画面: 左軸の棒と右軸の折れ線を組み合わせ、タイトル・説明・注記・出典を入れたグラフ](docs/images/chart.png)
+
 ## 配置方法
+
+配布用の zip は [Releases](https://github.com/masapico/miru/releases) から取得できます。展開した `miru/` フォルダを閉域網に持ち込んでください(テストなどの開発用ファイルは含まれていません)。
 
 このフォルダを丸ごと、Web サーバー(nginx / Apache / IIS など)の公開ディレクトリにコピーし、`index.html` を開いてください。
 
@@ -87,3 +93,14 @@ node --test tests/*.test.js
 ```
 
 Node.js 18 以上が必要です。`datetime` / `parser` / `schema` / `transform` は DOM に依存しないので、Node.js 上でそのままテストできます。
+
+### リリース
+
+`v` で始まるタグを push すると、GitHub Actions(`.github/workflows/release.yml`)がテストを実行し、配布用 zip(`miru-<タグ>.zip`)を添付した Release を作成します。`v1.0.0-rc1` のように `-` を含むタグはプレリリースになります。
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+zip は `git archive` で作るので、`.gitattributes` で `export-ignore` を指定したファイル(`tests/` など)は含まれません。

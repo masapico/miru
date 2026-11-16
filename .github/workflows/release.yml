@@ -1,0 +1,39 @@
+# v で始まるタグ(例: v1.0.0)を push すると、テストを実行してから
+# 配布用 zip を添付した GitHub Release を作成する。
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: テスト
+        run: node --test tests/*.test.js
+
+      - name: 配布用 zip を作成
+        # .gitattributes の export-ignore で指定したファイル(テスト・開発用)は含めない
+        run: git archive --format=zip --prefix=miru/ -o "miru-${GITHUB_REF_NAME}.zip" "${GITHUB_REF_NAME}"
+
+      - name: Release を作成
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "${GITHUB_REF_NAME}" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "${GITHUB_REF_NAME}" "miru-${GITHUB_REF_NAME}.zip" \
+            --title "Miru ${GITHUB_REF_NAME}" \
+            --generate-notes \
+            ${prerelease}

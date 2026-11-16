@@ -1,0 +1,6 @@
+# 配布用 zip(git archive)に含めない開発用ファイル
+/.github export-ignore
+/tests export-ignore
+/CLAUDE.md export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore

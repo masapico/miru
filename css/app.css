@@ -112,6 +112,10 @@ code {
   color: var(--app-text-muted);
 }
 
+.app-footer p {
+  margin: 0;
+}
+
 /* ---------- セクション ---------- */
 
 .app-main {
