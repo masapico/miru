@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Miru — データ可視化ツール</title>
+<meta name="description" content="Miru: JSONL / CSV ファイルをブラウザ内で読み込み、項目を選んでグラフを作成します。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 21V3h2v16h16v2H3Zm4-4V10h3v7H7Zm5 0V6h3v11h-3Zm5 0v-4h3v4h-3Z' fill='%233460fb'/%3E%3C/svg%3E">
+<!-- デジタル庁デザインシステム(HTML版コードスニペット / MIT License) -->
+<link rel="stylesheet" href="vendor/dads/global.css">
+<link rel="stylesheet" href="vendor/dads/components/button/button.css">
+<link rel="stylesheet" href="vendor/dads/components/form-control-label/form-control-label.css">
+<link rel="stylesheet" href="vendor/dads/components/select/select.css">
+<link rel="stylesheet" href="vendor/dads/components/checkbox/checkbox.css">
+<link rel="stylesheet" href="vendor/dads/components/radio/radio.css">
+<link rel="stylesheet" href="vendor/dads/components/input-text/input-text.css">
+<link rel="stylesheet" href="vendor/dads/components/file-upload/file-upload.css">
+<link rel="stylesheet" href="vendor/dads/components/table/table.css">
+<link rel="stylesheet" href="vendor/dads/components/notification-banner/notification-banner.css">
+<link rel="stylesheet" href="vendor/dads/components/heading/heading.css">
+<link rel="stylesheet" href="vendor/dads/components/accordion/accordion.css">
+<link rel="stylesheet" href="vendor/dads/components/chip-label/chip-label.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<a class="app-skip-link" href="#main">本文へ移動</a>
+
+<header class="app-header">
+  <div class="app-container app-header__inner">
+    <svg class="app-header__logo" width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 21V3h2v16h16v2H3Zm4-4V10h3v7H7Zm5 0V6h3v11h-3Zm5 0v-4h3v4h-3Z" fill="currentcolor"/>
+    </svg>
+    <div>
+      <p class="app-header__title">Miru<span class="app-header__sub">データ可視化ツール</span></p>
+      <p class="app-header__lead">JSONL / CSV をブラウザ内で読み込んでグラフを作成します。ファイルはサーバーへ送信されません。</p>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="app-container app-main">
+
+  <!-- 1. 読み込み -->
+  <section class="app-section" aria-labelledby="h-load">
+    <div class="dads-heading" data-size="24">
+      <h1 id="h-load" class="dads-heading__heading">1. データを読み込む</h1>
+    </div>
+    <p class="app-text-muted">対応形式: JSON Lines(.jsonl / .ndjson / .log)、JSON 配列(.json)、CSV(.csv)、TSV(.tsv)。文字コードは UTF-8 / Shift_JIS を自動判定します。</p>
+
+    <dads-file-upload id="file-upload" class="dads-file-upload" max-file-size="300MB">
+      <input class="dads-file-upload__input" type="file" name="file" accept=".jsonl,.ndjson,.log,.json,.csv,.tsv,.txt" data-js-input>
+
+      <div class="dads-u-visually-hidden" aria-live="polite" data-js-announcer></div>
+      <div class="dads-u-visually-hidden" aria-live="assertive" data-js-announcer-assertive></div>
+
+      <div class="dads-file-upload__inner">
+        <div class="dads-file-upload__drop-area" data-js-drop-area>
+          <div class="dads-file-upload__button-area">
+            <button class="dads-button" data-type="outline" data-size="md" type="button" data-js-select-button>
+              ファイルを選択
+            </button>
+            <p>または、このエリア内にドラッグ＆ドロップ</p>
+          </div>
+          <p class="dads-file-upload__select-summary" data-js-select-summary></p>
+          <ul class="dads-file-upload__error-messages" data-js-error-messages></ul>
+          <p class="dads-file-upload__expand-drop-area">
+            <label class="dads-checkbox" data-size="sm">
+              <span class="dads-checkbox__checkbox">
+                <input class="dads-checkbox__input" type="checkbox" data-js-expand-drop-area>
+              </span>
+              <span class="dads-checkbox__label">ドラッグ＆ドロップの範囲をこのブラウザウィンドウ全体に広げる</span>
+            </label>
+          </p>
+        </div>
+        <p class="dads-file-upload__empty-message" data-js-empty-message>ファイルが選択されていません</p>
+        <ul class="dads-file-upload__file-list" data-js-file-list></ul>
+      </div>
+
+      <div class="dads-file-upload__viewport-overlay" data-js-viewport-overlay hidden>
+        <div class="dads-file-upload__viewport-overlay-message">
+          <span>このエリア内にファイルを</span><span>ドラッグ＆ドロップ</span>
+        </div>
+      </div>
+
+      <template data-js-template>
+        <li class="dads-file-upload__file-item">
+          <div class="dads-file-upload__file-marker"></div>
+          <div class="dads-file-upload__file-info" data-js-file-info>
+            <p>
+              <span class="dads-file-upload__file-name" data-slot="fileName"></span>
+              <span class="dads-file-upload__file-meta">
+                <span data-slot="fileSize"></span>（<span data-slot="fileSizeBytes"></span>バイト）
+              </span>
+            </p>
+          </div>
+          <button class="dads-file-upload__remove-button dads-button" data-type="text" data-size="xs" type="button" data-js-remove-button>解除</button>
+        </li>
+      </template>
+    </dads-file-upload>
+
+    <div id="banners" class="app-banners"></div>
+
+    <div id="load-result" hidden>
+      <div class="app-load-summary">
+        <dl class="app-stats" id="load-stats"></dl>
+      </div>
+
+      <fieldset class="app-load-options">
+        <legend class="app-subheading">読み込み設定</legend>
+        <div class="app-field-grid">
+          <div class="dads-form-control-label" data-size="sm">
+            <label class="dads-form-control-label__label" for="opt-format">ファイル形式</label>
+            <div class="dads-form-control-label__field" data-select="opt-format"></div>
+          </div>
+          <div class="dads-form-control-label" data-size="sm">
+            <label class="dads-form-control-label__label" for="opt-encoding">文字コード</label>
+            <div class="dads-form-control-label__field" data-select="opt-encoding"></div>
+          </div>
+          <div class="dads-form-control-label" data-size="sm">
+            <label class="dads-form-control-label__label" for="opt-header">CSV の 1 行目</label>
+            <div class="dads-form-control-label__field" data-select="opt-header"></div>
+          </div>
+          <div class="dads-form-control-label" data-size="sm">
+            <label class="dads-form-control-label__label" for="opt-tz">データのタイムゾーン</label>
+            <p id="opt-tz-help" class="dads-form-control-label__support-text">時差の表記がない日時の解釈に使います</p>
+            <div class="dads-form-control-label__field" data-select="opt-tz"></div>
+          </div>
+          <div class="dads-form-control-label" data-size="sm">
+            <label class="dads-form-control-label__label" for="opt-fystart">年度の開始月</label>
+            <div class="dads-form-control-label__field" data-select="opt-fystart"></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <details class="dads-accordion" open>
+        <summary id="acc-columns" class="dads-accordion__summary">
+          <span class="dads-accordion__icon">
+            <svg class="dads-accordion__icon-svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3.3 7.3L12 16L20.7 7.3" fill="none" stroke="currentcolor" stroke-width="2"/>
+            </svg>
+          </span>
+          <h2>列の型と書式(自動判定結果)</h2>
+        </summary>
+        <div class="dads-accordion__content">
+          <p class="app-text-muted">判定が誤っている場合は、型や日時の書式を変更してください。書式一覧にない日時は「カスタム」で <code>yyyy年M月d日 H時</code> のように指定できます(y:年 M:月 d:日 H:時 m:分 s:秒 g:元号 e:和暦年 Q:四半期)。</p>
+          <div class="dads-table app-table-scroll" data-size="dense">
+            <table class="dads-table__table" data-cell-border="bottom">
+              <thead>
+                <tr>
+                  <th class="dads-table__col-header" scope="col">列名</th>
+                  <th class="dads-table__col-header" scope="col">型</th>
+                  <th class="dads-table__col-header" scope="col">日時の書式</th>
+                  <th class="dads-table__col-header" scope="col">粒度</th>
+                  <th class="dads-table__col-header" scope="col">欠損 / 解析不可</th>
+                  <th class="dads-table__col-header" scope="col">値の例</th>
+                </tr>
+              </thead>
+              <tbody id="column-rows"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <details class="dads-accordion">
+        <summary id="acc-preview" class="dads-accordion__summary">
+          <span class="dads-accordion__icon">
+            <svg class="dads-accordion__icon-svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3.3 7.3L12 16L20.7 7.3" fill="none" stroke="currentcolor" stroke-width="2"/>
+            </svg>
+          </span>
+          <h2>データプレビュー(先頭 100 行)</h2>
+        </summary>
+        <div class="dads-accordion__content">
+          <div class="dads-table app-table-scroll app-table-scroll--tall" data-size="dense" data-row-stripe>
+            <table class="dads-table__table" data-cell-border="bottom">
+              <thead id="preview-head"></thead>
+              <tbody id="preview-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- 2. グラフ -->
+  <section id="viz-section" class="app-section" aria-labelledby="h-viz" hidden>
+    <div class="dads-heading" data-size="24">
+      <h2 id="h-viz" class="dads-heading__heading">2. グラフを作成する</h2>
+    </div>
+
+    <div class="app-layout">
+      <form id="settings" class="app-settings" novalidate>
+
+        <fieldset class="dads-form-control-label" data-size="sm">
+          <legend class="dads-form-control-label__legend">
+            <span class="dads-form-control-label__label">グラフの種類</span>
+          </legend>
+          <div class="dads-form-control-label__field app-radio-grid" id="chart-types"></div>
+        </fieldset>
+
+        <div class="dads-form-control-label" data-size="sm">
+          <label class="dads-form-control-label__label" for="x-col">X 軸(横軸)</label>
+          <p id="x-col-help" class="dads-form-control-label__support-text">日時の列を選ぶと時系列グラフになります</p>
+          <div class="dads-form-control-label__field" data-select="x-col"></div>
+        </div>
+
+        <fieldset class="dads-form-control-label" data-size="sm" aria-describedby="y-help">
+          <legend class="dads-form-control-label__legend">
+            <span class="dads-form-control-label__label">Y 軸(縦軸)に表示する数値</span>
+          </legend>
+          <p id="y-help" class="dads-form-control-label__support-text">最大 8 列まで選択できます</p>
+          <div class="dads-form-control-label__field app-y-list" id="y-list"></div>
+        </fieldset>
+
+        <div class="dads-form-control-label" data-size="sm">
+          <label class="dads-form-control-label__label" for="split-col">系列の分割</label>
+          <p id="split-help" class="dads-form-control-label__support-text">カテゴリ列の値ごとに線・棒を分けます</p>
+          <div class="dads-form-control-label__field" data-select="split-col"></div>
+        </div>
+
+        <div class="app-field-pair">
+          <div class="dads-form-control-label" data-size="sm">
+            <label class="dads-form-control-label__label" for="agg">集計</label>
+            <div class="dads-form-control-label__field" data-select="agg"></div>
+          </div>
+          <div class="dads-form-control-label" data-size="sm" id="bucket-field" hidden>
+            <label class="dads-form-control-label__label" for="bucket">時間の単位</label>
+            <div class="dads-form-control-label__field" data-select="bucket"></div>
+          </div>
+        </div>
+
+        <details class="dads-accordion app-accordion-compact" id="filter-acc">
+          <summary class="dads-accordion__summary">
+            <span class="dads-accordion__icon">
+              <svg class="dads-accordion__icon-svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3.3 7.3L12 16L20.7 7.3" fill="none" stroke="currentcolor" stroke-width="2"/>
+              </svg>
+            </span>
+            <h3>絞り込み <span id="filter-badge"></span></h3>
+          </summary>
+          <div class="dads-accordion__content app-stack">
+            <div id="range-fields" class="app-stack" hidden>
+              <div class="dads-form-control-label" data-size="sm">
+                <label class="dads-form-control-label__label" for="range-from">期間(開始)</label>
+                <div class="dads-form-control-label__field">
+                  <span class="dads-input-text">
+                    <input id="range-from" class="dads-input-text__input" type="datetime-local" data-size="sm">
+                  </span>
+                </div>
+              </div>
+              <div class="dads-form-control-label" data-size="sm">
+                <label class="dads-form-control-label__label" for="range-to">期間(終了)</label>
+                <p id="range-help" class="dads-form-control-label__support-text">表示タイムゾーンで指定します。終了はその分の終わりまで含みます</p>
+                <div class="dads-form-control-label__field">
+                  <span class="dads-input-text">
+                    <input id="range-to" class="dads-input-text__input" type="datetime-local" data-size="sm" aria-describedby="range-help">
+                  </span>
+                </div>
+              </div>
+              <div>
+                <button class="dads-button" data-type="text" data-size="sm" type="button" id="range-clear">期間をクリア</button>
+              </div>
+            </div>
+            <div class="dads-form-control-label" data-size="sm">
+              <label class="dads-form-control-label__label" for="filter-col">カテゴリで絞り込む列</label>
+              <div class="dads-form-control-label__field" data-select="filter-col"></div>
+            </div>
+            <fieldset id="filter-values-field" class="dads-form-control-label" data-size="sm" hidden>
+              <legend class="dads-form-control-label__legend">
+                <span class="dads-form-control-label__label">表示する値</span>
+              </legend>
+              <div class="app-inline-buttons">
+                <button class="dads-button" data-type="text" data-size="xs" type="button" id="filter-all">すべて選択</button>
+                <button class="dads-button" data-type="text" data-size="xs" type="button" id="filter-none">すべて解除</button>
+              </div>
+              <div class="dads-form-control-label__field app-check-scroll" id="filter-values"></div>
+            </fieldset>
+          </div>
+        </details>
+
+        <details class="dads-accordion app-accordion-compact">
+          <summary class="dads-accordion__summary">
+            <span class="dads-accordion__icon">
+              <svg class="dads-accordion__icon-svg" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3.3 7.3L12 16L20.7 7.3" fill="none" stroke="currentcolor" stroke-width="2"/>
+              </svg>
+            </span>
+            <h3>表示オプション</h3>
+          </summary>
+          <div class="dads-accordion__content app-stack">
+            <div class="dads-form-control-label" data-size="sm">
+              <label class="dads-form-control-label__label" for="chart-title">グラフのタイトル</label>
+              <div class="dads-form-control-label__field">
+                <span class="dads-input-text">
+                  <input id="chart-title" class="dads-input-text__input" type="text" data-size="sm">
+                </span>
+              </div>
+            </div>
+            <div class="app-field-pair">
+              <div class="dads-form-control-label" data-size="sm">
+                <label class="dads-form-control-label__label" for="calendar">日付の表記</label>
+                <div class="dads-form-control-label__field" data-select="calendar"></div>
+              </div>
+              <div class="dads-form-control-label" data-size="sm">
+                <label class="dads-form-control-label__label" for="display-tz">表示タイムゾーン</label>
+                <div class="dads-form-control-label__field" data-select="display-tz"></div>
+              </div>
+            </div>
+            <div class="app-field-pair">
+              <div class="dads-form-control-label" data-size="sm">
+                <label class="dads-form-control-label__label" for="legend-pos">凡例の位置</label>
+                <div class="dads-form-control-label__field" data-select="legend-pos"></div>
+              </div>
+              <div class="dads-form-control-label" data-size="sm">
+                <label class="dads-form-control-label__label" for="gap-factor">欠測とみなす間隔</label>
+                <p id="gap-help" class="dads-form-control-label__support-text">通常間隔の何倍で線を切るか(0 で常につなぐ)</p>
+                <div class="dads-form-control-label__field">
+                  <span class="dads-input-text">
+                    <input id="gap-factor" class="dads-input-text__input" type="number" min="0" step="0.5" value="3" data-size="sm" aria-describedby="gap-help">
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="app-stack app-stack--tight">
+              <label class="dads-checkbox" data-size="sm">
+                <span class="dads-checkbox__checkbox">
+                  <input class="dads-checkbox__input" type="checkbox" id="begin-zero">
+                </span>
+                <span class="dads-checkbox__label">縦軸を 0 から始める</span>
+              </label>
+              <label class="dads-checkbox" data-size="sm">
+                <span class="dads-checkbox__checkbox">
+                  <input class="dads-checkbox__input" type="checkbox" id="show-points">
+                </span>
+                <span class="dads-checkbox__label">折れ線に点を表示する</span>
+              </label>
+            </div>
+          </div>
+        </details>
+      </form>
+
+      <div class="app-chart-area">
+        <div class="app-chart-toolbar">
+          <p class="app-chart-meta" id="chart-meta" aria-live="polite"></p>
+          <div class="app-inline-buttons">
+            <button class="dads-button" data-type="outline" data-size="sm" type="button" id="btn-reset-zoom">ズーム解除</button>
+            <button class="dads-button" data-type="outline" data-size="sm" type="button" id="btn-png">PNG 保存</button>
+            <button class="dads-button" data-type="outline" data-size="sm" type="button" id="btn-csv">CSV 保存</button>
+          </div>
+        </div>
+        <div class="app-chart-canvas">
+          <canvas id="chart" role="img" aria-label="グラフ"></canvas>
+          <div class="app-chart-empty" id="chart-empty" hidden></div>
+        </div>
+        <p class="app-text-muted app-chart-help">操作: ドラッグで左右に移動 / Ctrl + ホイールで拡大・縮小 / Shift + ドラッグで範囲を拡大</p>
+        <ul class="app-notes" id="chart-notes"></ul>
+
+        <h3 class="app-subheading">系列ごとの要約</h3>
+        <div class="dads-table app-table-scroll" data-size="dense">
+          <table class="dads-table__table" data-cell-border="bottom">
+            <thead>
+              <tr>
+                <th class="dads-table__col-header" scope="col">系列</th>
+                <th class="dads-table__col-header app-num" scope="col">点数</th>
+                <th class="dads-table__col-header app-num" scope="col">最小</th>
+                <th class="dads-table__col-header app-num" scope="col">最大</th>
+                <th class="dads-table__col-header app-num" scope="col">平均</th>
+                <th class="dads-table__col-header app-num" scope="col">最新</th>
+              </tr>
+            </thead>
+            <tbody id="summary-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="app-footer">
+  <div class="app-container">
+    <p>使用ライブラリとライセンス: <a href="vendor/LICENSES.md">vendor/LICENSES.md</a></p>
+  </div>
+</footer>
+
+<script src="vendor/chartjs/chart.umd.min.js"></script>
+<script src="vendor/chartjs/hammer.min.js"></script>
+<script src="vendor/chartjs/chartjs-plugin-zoom.min.js"></script>
+<script src="vendor/papaparse/papaparse.min.js"></script>
+<script src="vendor/dads/components/file-upload/file-upload.js"></script>
+<script src="js/datetime.js"></script>
+<script src="js/date-adapter.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/schema.js"></script>
+<script src="js/transform.js"></script>
+<script src="js/chart-view.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
