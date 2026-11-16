@@ -147,6 +147,19 @@ code {
   gap: 4px;
 }
 
+.app-input-full {
+  width: 100%;
+}
+
+.app-textarea {
+  display: block;
+  min-height: 4.5rem;
+  padding-top: calc(8 / 16 * 1rem);
+  padding-bottom: calc(8 / 16 * 1rem);
+  line-height: 1.6;
+  resize: vertical;
+}
+
 .app-banners {
   display: grid;
   gap: 16px;

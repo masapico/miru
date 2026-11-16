@@ -9,6 +9,8 @@
     ["line", "折れ線"], ["area", "面"], ["bar", "棒"],
     ["stacked", "積み上げ棒"], ["scatter", "散布図"], ["pie", "円(ドーナツ)"],
   ];
+  var RIGHT_TYPES = [["line", "折れ線"], ["area", "面"], ["bar", "棒"], ["stacked", "積み上げ棒"]];
+  var LABEL_INPUTS = ["chart-title", "chart-subtitle", "x-title", "y-title", "y2-title", "chart-note", "chart-source"];
   var TYPE_OPTIONS = [["datetime", "日時"], ["number", "数値"], ["category", "カテゴリ"], ["text", "文字列"]];
   var MAX_Y = 8;
 
@@ -468,6 +470,8 @@
       CHART_TYPES.forEach(function (t, i) { ct.appendChild(makeRadio("chartType", t[0], t[1], i === 0)); });
       ct.addEventListener("change", function () { onSettingsChange(); });
     }
+    mountSelect("chart-type-right", RIGHT_TYPES, isNewFile || !$("chart-type-right") ? "line" : $("chart-type-right").value, { "aria-describedby": "right-type-help" })
+      .addEventListener("change", onSettingsChange);
 
     var prevX = $("x-col") ? $("x-col").value : null;
     var xCandidates = state.defs.filter(function (c) { return c.type !== "empty"; });
@@ -494,7 +498,7 @@
       .addEventListener("change", onSettingsChange);
 
     if (isNewFile) {
-      $("chart-title").value = "";
+      LABEL_INPUTS.forEach(function (id) { $(id).value = ""; });
       document.querySelector('input[name="chartType"][value="line"]').checked = true;
     }
     onXChange(true);
@@ -712,18 +716,31 @@
     });
     var fcol = $("filter-col").value;
     var chartType = (document.querySelector('input[name="chartType"]:checked') || {}).value || "line";
+    var agg = $("agg").value;
+    var usesRight = agg !== "count" && ys.some(function (y) { return y.right; });
+    var mixable = chartType !== "pie" && chartType !== "scatter";
     return {
       chartType: chartType,
+      chartTypeRight: usesRight && mixable ? $("chart-type-right").value : null,
+      usesRight: usesRight,
       x: x,
       ys: ys,
       split: $("split-col").value || null,
-      agg: $("agg").value,
+      agg: agg,
       bucket: $("bucket").value,
       from: from,
       to: to,
       filter: fcol ? { col: fcol, values: currentFilterValues() } : null,
       display: display,
-      title: $("chart-title").value.trim(),
+      labels: {
+        title: $("chart-title").value,
+        subtitle: $("chart-subtitle").value,
+        xTitle: $("x-title").value,
+        yTitle: $("y-title").value,
+        y2Title: $("y2-title").value,
+        note: $("chart-note").value,
+        source: $("chart-source").value,
+      },
       beginAtZero: $("begin-zero").checked,
       showPoints: $("show-points").checked,
       legend: $("legend-pos").value,
@@ -762,12 +779,13 @@
   }
 
   function setToolbarEnabled(on) {
-    ["btn-reset-zoom", "btn-png", "btn-csv"].forEach(function (id) { $(id).disabled = !on; });
+    ["btn-reset-zoom", "btn-png", "btn-svg", "btn-csv"].forEach(function (id) { $(id).disabled = !on; });
   }
 
   function renderChart() {
     if (!state.table || $("viz-section").hidden) return;
     var cfg = readConfig();
+    syncDependentFields(cfg);
     var res;
     try {
       res = T.build({ cols: state.cols, mat: state.mat, rowCount: state.table.rows.length }, cfg);
@@ -811,11 +829,25 @@
 
     renderSummary(res);
     $("chart").setAttribute("aria-label", describe(res, cfg));
+    $("x-title").placeholder = out.axisTitles.x || "";
+    $("y-title").placeholder = out.axisTitles.y || "";
+    $("y2-title").placeholder = out.axisTitles.y2 || "";
+  }
+
+  /** 右軸の種類・軸名の入力欄を、いまの設定で意味があるときだけ表示する */
+  function syncDependentFields(cfg) {
+    var pie = cfg.chartType === "pie";
+    $("right-type-field").hidden = !cfg.chartTypeRight;
+    $("axis-title-fields").hidden = pie;
+    $("y2-title-field").hidden = pie || !cfg.usesRight;
   }
 
   function describe(res, cfg) {
-    var typeLabel = CHART_TYPES.filter(function (t) { return t[0] === cfg.chartType; })[0][1];
-    var s = (cfg.title ? cfg.title + "。" : "") + typeLabel + "グラフ。横軸: " + res.xName + "。";
+    function label(list, v) { return list.filter(function (t) { return t[0] === v; })[0][1]; }
+    var title = cfg.labels.title.trim();
+    var s = (title ? title + "。" : "") + label(CHART_TYPES, cfg.chartType) + "グラフ";
+    if (cfg.chartTypeRight) s += "(右軸は" + label(RIGHT_TYPES, cfg.chartTypeRight) + ")";
+    s += "。横軸: " + res.xName + "。";
     s += res.series.map(function (x) {
       return x.label + "(最小 " + V.fmtNum(x.summary.min) + "、最大 " + V.fmtNum(x.summary.max) + "、平均 " + V.fmtNum(x.summary.avg) + ")";
     }).join("、");
@@ -859,6 +891,25 @@
     download(state.chart.toBase64Image("image/png", 1), baseName() + "_chart.png");
   }
 
+  function saveSVG() {
+    if (!state.chart || !state.lastRes) return;
+    var c = state.chart;
+    var xRange = null;
+    if (c.isZoomedOrPanned && c.isZoomedOrPanned() && c.scales.x) xRange = { min: c.scales.x.min, max: c.scales.x.max };
+    var svg;
+    try {
+      svg = V.exportSVG(state.lastRes, state.lastCfg, { width: c.width, height: c.height, xRange: xRange });
+    } catch (err) {
+      console.error(err);
+      showBanner("error", "SVG を作成できませんでした", [String(err && err.message || err)]);
+      return;
+    }
+    var blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n' + svg], { type: "image/svg+xml;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    download(url, baseName() + "_chart.svg");
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
   function saveCSV() {
     if (!state.lastRes) return;
     var csv = T.toCSV(T.toTable(state.lastRes, state.lastCfg.display));
@@ -875,6 +926,7 @@
     $("file-upload").addEventListener("viz-files-change", onFilesChange);
     $("btn-reset-zoom").addEventListener("click", function () { if (state.chart && state.chart.resetZoom) state.chart.resetZoom(); });
     $("btn-png").addEventListener("click", savePNG);
+    $("btn-svg").addEventListener("click", saveSVG);
     $("btn-csv").addEventListener("click", saveCSV);
     $("range-clear").addEventListener("click", function () { $("range-from").value = ""; $("range-to").value = ""; onSettingsChange(); });
     $("filter-all").addEventListener("click", function () {
@@ -888,7 +940,9 @@
     ["range-from", "range-to", "begin-zero", "show-points", "gap-factor"].forEach(function (id) {
       $(id).addEventListener("change", onSettingsChange);
     });
-    $("chart-title").addEventListener("input", function () { scheduleRender(300); });
+    LABEL_INPUTS.forEach(function (id) {
+      $(id).addEventListener("input", function () { scheduleRender(300); });
+    });
     $("settings").addEventListener("submit", function (e) { e.preventDefault(); });
   }
 

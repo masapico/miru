@@ -130,3 +130,15 @@ test("系列が多いときは「その他」にまとめる", () => {
   assert.equal(r.series[7].label, "その他");
   assert.equal(new Set(r.series.map((s) => s.colorIndex)).size, 8);
 });
+
+test("右軸だけ棒のときも、数値の X はカテゴリ軸にする", () => {
+  const { ctx } = load("n,a,b\n1,10,100\n2,20,200\n3,30,300\n", "n.csv");
+  const ys = [{ name: "a" }, { name: "b", right: true }];
+  const line = T.build(ctx, { chartType: "line", x: "n", ys, agg: "none", bucket: "raw", display });
+  assert.equal(line.xKind, "linear");
+  const mixed = T.build(ctx, { chartType: "line", chartTypeRight: "bar", x: "n", ys, agg: "none", bucket: "raw", display });
+  assert.equal(mixed.xKind, "category");
+  assert.deepEqual(mixed.series.map((s) => s.axis), ["y", "y2"]);
+  const stacked = T.build(ctx, { chartType: "area", chartTypeRight: "stacked", x: "n", ys, agg: "none", bucket: "raw", display });
+  assert.equal(stacked.xKind, "category");
+});

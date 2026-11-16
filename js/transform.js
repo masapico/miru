@@ -39,7 +39,7 @@
 
   /**
    * @param ctx  {cols: {name: colDef}, mat: {name: materialized}, rowCount}
-   * @param cfg  {chartType, x, ys:[{name, right, color}], split, agg, bucket, from, to,
+   * @param cfg  {chartType, chartTypeRight, x, ys:[{name, right, color}], split, agg, bucket, from, to,
    *              filter:{col, values:[]}|null, display:{tz, calendar, fyStart}}
    */
   function build(ctx, cfg) {
@@ -68,7 +68,10 @@
     var xGran = xType === "datetime" ? bucket || xm.granularity : null;
     var xKind;
     if (xType === "datetime") xKind = isPie || VizDate.isPeriodGran(xGran) ? "period" : "time";
-    else if (xType === "number") xKind = isPie || chartType === "bar" || chartType === "stacked" ? "category" : "linear";
+    else if (xType === "number") {
+      var usesBar = [chartType, cfg.chartTypeRight].some(function (t) { return t === "bar" || t === "stacked"; });
+      xKind = isPie || usesBar ? "category" : "linear";
+    }
     else xKind = "category";
 
     /* --- 行の絞り込み --- */
