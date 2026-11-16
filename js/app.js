@@ -13,6 +13,7 @@
   var LABEL_INPUTS = ["chart-title", "chart-subtitle", "x-title", "y-title", "y2-title", "chart-note", "chart-source"];
   var TYPE_OPTIONS = [["datetime", "日時"], ["number", "数値"], ["category", "カテゴリ"], ["text", "文字列"]];
   var MAX_Y = 8;
+  var LOADING_MIN_BYTES = 1048576; // これ以上のファイルは、解析の前に「読み込み中」を表示する
   var RAW_HEAD_STEP = 20; // 「ファイルの先頭」の最小の表示行数と、1 回に増やす行数
 
   var state = {
@@ -165,6 +166,7 @@
     var file = info.file;
     if (state.file && state.file.ref === file) return;
     $("chart-meta").textContent = "読み込み中…";
+    if (file.size >= LOADING_MIN_BYTES) showLoading("ファイルを読み込んでいます…(" + file.name + "、" + fmtBytes(file.size) + ")");
     file.arrayBuffer().then(function (buf) {
       state.file = { name: file.name, size: file.size, buf: buf, ref: file };
       state.loadOpt.format = "auto";
@@ -172,13 +174,48 @@
       resetRowOptions();
       loadData(true);
     }).catch(function (err) {
+      hideLoading();
       showBanner("error", "ファイルを読み込めませんでした", [String(err && err.message || err)]);
+    });
+  }
+
+  /* ---------- 読み込み中の表示 ---------- */
+
+  function showLoading(text) {
+    $("loading-text").textContent = text;
+    $("loading").hidden = false;
+  }
+
+  function hideLoading() { $("loading").hidden = true; }
+
+  /** 表示を画面に反映させてから fn を実行する(解析は画面を止めるので、先に描かせる) */
+  function afterPaint(fn) {
+    var done = false;
+    function run() { if (!done) { done = true; fn(); } }
+    requestAnimationFrame(function () { setTimeout(run, 0); });
+    setTimeout(run, 200); // タブが裏にあるなど、描画が行われないとき
+  }
+
+  /** 解析して画面に出す。大きなファイルは「読み込み中」を表示してから行う */
+  function loadData(isNewFile) {
+    if (!state.file || state.file.size < LOADING_MIN_BYTES) { hideLoading(); loadDataNow(isNewFile); return; }
+    var file = state.file;
+    showLoading("データを解析しています…(" + file.name + "、" + fmtBytes(file.size) + ")");
+    afterPaint(function () {
+      if (state.file !== file) { if (!state.file) hideLoading(); return; }
+      try {
+        loadDataNow(isNewFile);
+      } finally {
+        // グラフの描画(scheduleRender(0))が済んでから消す
+        setTimeout(function () { if (state.file === file || !state.file) hideLoading(); }, 0);
+      }
     });
   }
 
   function resetAll() {
     state.file = null;
     state.table = null;
+    hideLoading();
     destroyChart();
     clearBanners();
     $("load-result").hidden = true;
@@ -197,7 +234,7 @@
   }
 
   /** デコード → 解析 → 型推論 → 値配列化 */
-  function loadData(isNewFile) {
+  function loadDataNow(isNewFile) {
     clearBanners();
     var dec, table;
     try {
