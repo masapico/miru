@@ -161,7 +161,7 @@
         </summary>
         <div class="dads-accordion__content">
           <p class="app-text-muted">列名の行やデータの開始行が合っていない場合は、ここで行番号を確かめて「読み込み設定」に入力してください。</p>
-          <div class="dads-table app-table-scroll" data-size="dense">
+          <div class="dads-table app-table-scroll app-table-scroll--tall" data-size="dense">
             <table class="dads-table__table" data-cell-border="bottom">
               <thead>
                 <tr>
@@ -172,6 +172,10 @@
               </thead>
               <tbody id="raw-head-body"></tbody>
             </table>
+          </div>
+          <div class="app-raw-head-more">
+            <p id="raw-head-count" class="app-text-muted" aria-live="polite"></p>
+            <button class="dads-button" data-type="outline" data-size="sm" type="button" id="raw-head-more">さらに 20 行表示</button>
           </div>
         </div>
       </details>

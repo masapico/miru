@@ -14,7 +14,8 @@
 
   var FORMAT_LABEL = { jsonl: "JSON Lines", json: "JSON 配列", csv: "CSV", tsv: "TSV" };
   var MAX_ERRORS_KEPT = 20;
-  var RAW_HEAD_ROWS = 20;
+  // 「ファイルの先頭」として画面に渡す行数の上限
+  var RAW_HEAD_ROWS = 1000;
 
   function getPapa() {
     if (root && root.Papa) return root.Papa;
@@ -304,7 +305,11 @@
     t.delimiter = res.meta.delimiter;
     t.headerRow = headerRow;
     t.dataRow = dataRow;
-    t.rawHead = data.slice(0, RAW_HEAD_ROWS);
+    // 画面で行番号を確かめるための、解析前の行(先頭のみ)と全体の行数(末尾の空行は数えない)
+    var total = data.length;
+    while (total > 0 && !usedWidth(data[total - 1])) total--;
+    t.rawHead = data.slice(0, Math.min(total, RAW_HEAD_ROWS));
+    t.rawTotal = total;
     // 列数が揃わない行は警告として扱う(値は取り込む)
     var expected = t.columns.length;
     var mismatch = 0;
@@ -332,6 +337,7 @@
    *   headerRow?: number, dataRow?: number, columnNames?: string[]}} opt
    *   headerRow / dataRow は CSV / TSV の列名の行・データの開始行(1 始まり。省略すると自動)。
    *   columnNames は列番号順の列名(空の要素は元の列名のまま)。
+   *   CSV / TSV の結果には、解析前の先頭の行 rawHead(最大 1000 行)と全体の行数 rawTotal が付く。
    */
   function parse(text, opt) {
     opt = opt || {};

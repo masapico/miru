@@ -13,12 +13,14 @@
   var LABEL_INPUTS = ["chart-title", "chart-subtitle", "x-title", "y-title", "y2-title", "chart-note", "chart-source"];
   var TYPE_OPTIONS = [["datetime", "日時"], ["number", "数値"], ["category", "カテゴリ"], ["text", "文字列"]];
   var MAX_Y = 8;
+  var RAW_HEAD_STEP = 20; // 「ファイルの先頭」の最小の表示行数と、1 回に増やす行数
 
   var state = {
     file: null,          // {name, size, buf}
     // headerRow / dataRow は 1 始まり(null は自動)。colNames は列番号順の、画面で付けた列名
     loadOpt: { format: "auto", encoding: "auto", header: "yes", headerRow: null, dataRow: null, colNames: [], tz: "JST", fyStart: 4 },
     table: null,
+    rawShown: RAW_HEAD_STEP, // 「ファイルの先頭」に表示する行数
     defs: [],
     cols: {},
     mat: {},
@@ -243,7 +245,12 @@
     reportInvalid();
 
     renderLoadOptions(dec.encoding, table);
+    // 列名の行・データの開始行が下の方にあっても、その少し先まで見えるようにする(広げた表示は縮めない)
+    var need = Math.max(RAW_HEAD_STEP, (table.dataRow || 0) + 5);
+    state.rawShown = isNewFile ? need : Math.max(state.rawShown, need);
     renderRawHead();
+    state.rawScrollPending = true;
+    scrollRawHeadToStart();
     renderStats();
     renderColumnTable();
     renderPreview();
@@ -324,12 +331,21 @@
     body.textContent = "";
     if (!t.rawHead) { section.hidden = true; return; }
     section.hidden = false;
-    var width = t.rawHead.reduce(function (m, r) { return Math.max(m, r.length); }, 1);
+    var shown = t.rawHead.slice(0, state.rawShown);
+    var width = shown.reduce(function (m, r) { return Math.max(m, r.length); }, 1);
     $("raw-head-content").colSpan = width;
+    var total = t.rawTotal;
+    var count = shown.length >= total
+      ? "全 " + total.toLocaleString("ja-JP") + " 行を表示"
+      : "全 " + total.toLocaleString("ja-JP") + " 行のうち先頭 " + shown.length.toLocaleString("ja-JP") + " 行を表示";
+    var more = shown.length < t.rawHead.length;
+    if (!more && shown.length < total) count += "(ここで確認できるのは先頭 " + shown.length.toLocaleString("ja-JP") + " 行までです)";
+    $("raw-head-count").textContent = count;
+    $("raw-head-more").hidden = !more;
     function chip(text, color) {
       return el("span", { className: "dads-chip-label", "data-style": "filled-1", "data-color": color, text: text });
     }
-    t.rawHead.forEach(function (r, i) {
+    shown.forEach(function (r, i) {
       var line = i + 1;
       var empty = r.every(function (v) { return String(v).trim() === ""; });
       var role = null;
@@ -338,11 +354,29 @@
       else if (line < t.dataRow || empty) role = el("span", { className: "app-text-muted", text: empty ? "空行" : "読み飛ばす" });
       var cells = [];
       for (var c = 0; c < width; c++) cells.push(el("td", { text: r[c] === undefined ? "" : String(r[c]).slice(0, 60) }));
-      body.appendChild(el("tr", { className: line < t.dataRow && line !== t.headerRow ? "app-row-skipped" : null }, [
+      body.appendChild(el("tr", { className: line < t.dataRow && line !== t.headerRow ? "app-row-skipped" : null, "data-start": line === (t.headerRow || t.dataRow) ? "" : null }, [
         el("th", { scope: "row", className: "app-rownum", text: String(line) }),
         el("td", null, [role]),
       ].concat(cells)));
     });
+  }
+
+  /**
+   * 読み込みの後、列名の行(なければデータの開始行)が見える位置まで表の枠をスクロールする。
+   * 折りたたまれている間は位置を決められないので、開いたときに行う。
+   */
+  function scrollRawHeadToStart() {
+    var section = $("raw-head-section");
+    if (!state.rawScrollPending || section.hidden || !section.open) return;
+    state.rawScrollPending = false;
+    var row = $("raw-head-body").querySelector("tr[data-start]");
+    var box = section.querySelector(".app-table-scroll");
+    if (!row) { box.scrollTop = 0; return; }
+    // 見出し行の下に、直前の 2 行と合わせて見えるようにする
+    var prev = row.previousElementSibling;
+    if (prev && prev.previousElementSibling) prev = prev.previousElementSibling;
+    var head = section.querySelector("thead");
+    box.scrollTop = Math.max(0, (prev || row).offsetTop - head.offsetHeight);
   }
 
   function refreshDatetimeColumns() {
@@ -1050,6 +1084,11 @@
     });
     $("opt-header-row").addEventListener("change", function (e) { onRowOptionChange("headerRow", e); });
     $("opt-data-row").addEventListener("change", function (e) { onRowOptionChange("dataRow", e); });
+    $("raw-head-section").addEventListener("toggle", scrollRawHeadToStart);
+    $("raw-head-more").addEventListener("click", function () {
+      state.rawShown += RAW_HEAD_STEP;
+      renderRawHead();
+    });
     $("settings").addEventListener("submit", function (e) { e.preventDefault(); });
   }
 

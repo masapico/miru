@@ -185,6 +185,25 @@ test("列名の行・データの開始行の指定と、警告の行番号", ()
   assert.deepEqual(tt.rows, [["1", "2"], ["3", "4"]]);
 });
 
+test("ファイルの先頭(rawHead): 列名の行が 20 行より下にあっても含む", () => {
+  const pre = [];
+  for (let i = 1; i <= 26; i++) pre.push(i % 5 === 0 ? "" : "前置き " + i);
+  const text = pre.join("\n") + "\n日付,地域,値\n2026-01-01,東,10\n2026-01-02,西,20\n";
+  const t = P.parse(text, { fileName: "x.csv" });
+  assert.equal(t.headerRow, 27);
+  assert.equal(t.dataRow, 28);
+  assert.equal(t.rawTotal, 29); // 末尾の改行による空行は数えない
+  assert.equal(t.rawHead.length, 29);
+  assert.deepEqual(t.rawHead[26], ["日付", "地域", "値"]);
+
+  // 長いファイルは先頭 1000 行まで。全体の行数は rawTotal でわかる
+  let long = "a,b\n";
+  for (let i = 0; i < 1500; i++) long += i + "," + i * 2 + "\n";
+  const lt = P.parse(long, { fileName: "x.csv" });
+  assert.equal(lt.rawHead.length, 1000);
+  assert.equal(lt.rawTotal, 1501);
+});
+
 test("列名なしの CSV に列名を付ける・列名の変更", () => {
   const text = "出力結果\n\n2026-01-01,東,10\n2026-01-02,西,20\n";
   const none = P.parse(text, { fileName: "x.csv", hasHeader: false });
